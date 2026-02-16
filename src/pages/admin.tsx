@@ -1,4 +1,5 @@
 import type { FC } from "hono/jsx";
+import { raw } from "hono/utils/html";
 import { Layout } from "./layout";
 
 export const AdminPage: FC = () => {
@@ -52,7 +53,7 @@ export const AdminPage: FC = () => {
         </div>
       </div>
 
-      <script>{`
+      <script>{raw(`
 (function() {
   var tokenKey = 'fire_admin_token';
   var token = sessionStorage.getItem(tokenKey) || '';
@@ -193,7 +194,7 @@ export const AdminPage: FC = () => {
     return d.innerHTML;
   }
 })();
-      `}</script>
+      `)}</script>
     </Layout>
   );
 };

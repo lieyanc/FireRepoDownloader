@@ -1,6 +1,7 @@
 import type { FC, PropsWithChildren } from "hono/jsx";
+import { raw } from "hono/utils/html";
 
-const css = `
+const css = raw(`
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   line-height:1.6;color:#1a1a2e;background:#f0f2f5;min-height:100vh;display:flex;flex-direction:column}
@@ -65,7 +66,7 @@ th{font-weight:600;font-size:.85rem;color:#57606a;text-transform:uppercase;lette
 .markdown-body code{background:#f0f2f5;padding:2px 6px;border-radius:3px;font-size:.9em}
 .markdown-body pre{background:#f0f2f5;padding:12px;border-radius:6px;overflow-x:auto;margin-bottom:12px}
 .markdown-body pre code{background:none;padding:0}
-`;
+`);
 
 export const Layout: FC<PropsWithChildren<{ title?: string }>> = (props) => {
   return (

@@ -1,4 +1,5 @@
 import type { FC } from "hono/jsx";
+import { raw } from "hono/utils/html";
 import { Layout } from "./layout";
 
 export const HomePage: FC = () => {
@@ -42,7 +43,7 @@ export const HomePage: FC = () => {
         </div>
       </div>
 
-      <script>{`
+      <script>{raw(`
         document.getElementById('search-form').addEventListener('submit', function(e) {
           e.preventDefault();
           var val = document.getElementById('repo-input').value.trim();
@@ -52,7 +53,7 @@ export const HomePage: FC = () => {
             window.location.href = '/' + parts[0] + '/' + parts[1];
           }
         });
-      `}</script>
+      `)}</script>
     </Layout>
   );
 };
