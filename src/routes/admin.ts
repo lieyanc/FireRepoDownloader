@@ -11,7 +11,12 @@ const admin = new Hono<{ Bindings: Bindings }>();
 admin.use(
   "/api/*",
   async (c, next) => {
-    const auth = bearerAuth({ token: c.env.ADMIN_TOKEN });
+    const configuredToken = c.env.ADMIN_TOKEN?.trim();
+    if (!configuredToken) {
+      console.error("ADMIN_TOKEN is not configured");
+      return c.json({ error: "Admin authentication is not configured" }, 500);
+    }
+    const auth = bearerAuth({ token: configuredToken });
     return auth(c, next);
   }
 );

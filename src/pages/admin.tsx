@@ -66,41 +66,114 @@ export const AdminPage: FC = () => {
     return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
   }
 
+  function setLoginStatus(message, color) {
+    loginStatus.textContent = message || '';
+    loginStatus.style.color = color || '';
+  }
+
+  function clearSession() {
+    token = '';
+    sessionStorage.removeItem(tokenKey);
+  }
+
+  function showLogin(message) {
+    loginSection.style.display = 'block';
+    adminContent.style.display = 'none';
+    setLoginStatus(message || '', message ? '#cf222e' : '');
+  }
+
   function showAdmin() {
     loginSection.style.display = 'none';
     adminContent.style.display = 'block';
+    setLoginStatus('', '');
     loadRepos();
     loadStats();
   }
 
+  function readResponse(r) {
+    return r.text().then(function(text) {
+      if (!text) {
+        return { ok: r.ok, status: r.status, data: null };
+      }
+      try {
+        return { ok: r.ok, status: r.status, data: JSON.parse(text) };
+      } catch (_) {
+        return { ok: r.ok, status: r.status, data: { error: text } };
+      }
+    });
+  }
+
+  function handleAuthFailure(status) {
+    if (status === 401 || status === 403) {
+      clearSession();
+      showLogin('Session expired, please login again');
+      return true;
+    }
+    return false;
+  }
+
   function tryLogin() {
-    token = adminToken.value.trim();
-    if (!token) return;
+    var inputToken = adminToken.value.trim();
+    if (!inputToken) {
+      setLoginStatus('Token is required', '#cf222e');
+      return;
+    }
+    token = inputToken;
+    setLoginStatus('Verifying...', '#57606a');
     fetch('/admin/api/repos', { headers: apiHeaders() })
-      .then(function(r) {
-        if (r.ok) {
+      .then(readResponse)
+      .then(function(res) {
+        if (res.ok) {
           sessionStorage.setItem(tokenKey, token);
           showAdmin();
+        } else if (res.status === 500) {
+          clearSession();
+          setLoginStatus('Server ADMIN_TOKEN is not configured', '#cf222e');
         } else {
-          loginStatus.textContent = 'Invalid token';
-          loginStatus.style.color = '#cf222e';
+          clearSession();
+          setLoginStatus('Invalid token', '#cf222e');
         }
       })
-      .catch(function() { loginStatus.textContent = 'Connection error'; });
+      .catch(function() {
+        clearSession();
+        setLoginStatus('Connection error', '#cf222e');
+      });
   }
 
   document.getElementById('login-btn').addEventListener('click', tryLogin);
   adminToken.addEventListener('keydown', function(e) { if (e.key === 'Enter') tryLogin(); });
 
-  if (token) {
-    showAdmin();
+  function verifyStoredToken() {
+    if (!token) {
+      showLogin('');
+      return;
+    }
+    fetch('/admin/api/repos', { headers: apiHeaders() })
+      .then(function(r) {
+        if (r.ok) {
+          showAdmin();
+        } else {
+          clearSession();
+          showLogin('Please login');
+        }
+      })
+      .catch(function() {
+        clearSession();
+        showLogin('Connection error');
+      });
   }
 
   function loadRepos() {
+    var container = document.getElementById('repos-list');
     fetch('/admin/api/repos', { headers: apiHeaders() })
-      .then(function(r) { return r.json(); })
-      .then(function(repos) {
-        var container = document.getElementById('repos-list');
+      .then(readResponse)
+      .then(function(res) {
+        if (!res.ok) {
+          if (handleAuthFailure(res.status)) return;
+          container.innerHTML = '<p class="text-muted text-sm">Failed to load repositories.</p>';
+          return;
+        }
+        var repos = Array.isArray(res.data) ? res.data : [];
         if (!repos.length) {
           container.innerHTML = '<p class="text-muted text-sm">No repositories configured.</p>';
           return;
@@ -114,14 +187,23 @@ export const AdminPage: FC = () => {
         });
         html += '</tbody></table>';
         container.innerHTML = html;
+      })
+      .catch(function() {
+        container.innerHTML = '<p class="text-muted text-sm">Failed to load repositories.</p>';
       });
   }
 
   function loadStats() {
+    var container = document.getElementById('stats-content');
     fetch('/admin/api/stats', { headers: apiHeaders() })
-      .then(function(r) { return r.json(); })
-      .then(function(stats) {
-        var container = document.getElementById('stats-content');
+      .then(readResponse)
+      .then(function(res) {
+        if (!res.ok) {
+          if (handleAuthFailure(res.status)) return;
+          container.innerHTML = '<p class="text-muted text-sm">Failed to load statistics.</p>';
+          return;
+        }
+        var stats = Array.isArray(res.data) ? res.data : [];
         if (!stats.length) {
           container.innerHTML = '<p class="text-muted text-sm">No download statistics yet.</p>';
           return;
@@ -135,6 +217,9 @@ export const AdminPage: FC = () => {
         });
         html += '</tbody></table>';
         container.innerHTML = html;
+      })
+      .catch(function() {
+        container.innerHTML = '<p class="text-muted text-sm">Failed to load statistics.</p>';
       });
   }
 
@@ -160,7 +245,7 @@ export const AdminPage: FC = () => {
       headers: apiHeaders(),
       body: JSON.stringify({ token: ghToken })
     })
-    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(readResponse)
     .then(function(res) {
       if (res.ok) {
         status.textContent = 'Token saved for ' + repoName;
@@ -169,7 +254,8 @@ export const AdminPage: FC = () => {
         document.getElementById('github-token').value = '';
         loadRepos();
       } else {
-        status.textContent = res.data.error || 'Failed to save token';
+        if (handleAuthFailure(res.status)) return;
+        status.textContent = (res.data && res.data.error) || 'Failed to save token';
         status.style.color = '#cf222e';
       }
     })
@@ -183,10 +269,20 @@ export const AdminPage: FC = () => {
       method: 'DELETE',
       headers: apiHeaders()
     })
-    .then(function(r) {
-      if (r.ok) loadRepos();
+    .then(readResponse)
+    .then(function(res) {
+      if (res.ok) {
+        loadRepos();
+      } else if (!handleAuthFailure(res.status)) {
+        alert((res.data && res.data.error) || 'Failed to delete token');
+      }
+    })
+    .catch(function() {
+      alert('Connection error');
     });
   };
+
+  verifyStoredToken();
 
   function escHtml(s) {
     var d = document.createElement('div');
