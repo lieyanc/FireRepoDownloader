@@ -10,7 +10,7 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
 - **下载统计** — 自动记录每个 asset 的下载次数
 - **Admin 面板** — Token 管理 + 统计概览，Bearer Token 认证
 
-## 部署（Cloudflare 网页端）
+## 部署（Cloudflare Dashboard + Git）
 
 ### 1. 创建 KV Namespace
 
@@ -26,13 +26,25 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
 2. 选择 **Connect to Git**，授权并选择本仓库
 3. 构建配置：
    - **Framework preset**: `None`
-   - **Build command**: `npm install && npm run deploy`
+   - **Build command**: `npm ci && npm run typecheck`
+   - **Deploy command (Production)**: `npx wrangler@latest deploy --strict`
+   - **Deploy command (Non-Production)**: `npx wrangler@latest versions upload`
    - **Build output directory**: 留空（Worker 项目不需要）
 4. 点击 **Save and Deploy**
 
-> 如果使用 Workers（而非 Pages）部署，也可以直接在 **Workers & Pages > Create > Create Worker** 中创建，然后在 Settings 中连接 Git 仓库。
+> 不要在仓库构建命令中使用 `npm run deploy` 或 `wrangler deploy`，避免把 Dashboard 运行时配置（例如 KV 绑定）被仓库文件覆盖。  
+> Workers Builds 仍会执行 Deploy command（默认就是 `npx wrangler deploy`）；这里的目标是把部署入口放在 Dashboard 配置里统一管理。
 
-### 3. 绑定 KV Namespace
+### 3. 配置归属（防止 KV 被后续 Git 部署覆盖）
+
+1. 生产配置以 Dashboard 为准：
+   - **Settings > Bindings** 管理 `REPO_TOKENS`、`DOWNLOAD_STATS`
+   - **Settings > Variables and Secrets** 管理 `ADMIN_TOKEN`
+2. `wrangler.toml` 只保留基础字段（`name`、`main`、`compatibility_date`），不要写 `kv_namespaces`。
+3. Production Deploy command 使用 `--strict`，当本地配置和远端配置冲突时会阻止覆盖并报错。
+4. Non-Production 建议使用默认 `npx wrangler versions upload` 产出预览版本，不直接影响生产流量。
+5. 每次改完 Bindings/Secrets 后点击 **Deploy** 使其生效。
+### 4. 绑定 KV Namespace
 
 1. 进入部署好的 Worker 项目 > **Settings > Bindings**
 2. 点击 **Add**，选择 **KV Namespace**
@@ -41,7 +53,7 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
    - Variable name: `DOWNLOAD_STATS` → 选择步骤 1 中创建的 `DOWNLOAD_STATS` namespace
 4. 保存后重新部署生效
 
-### 4. 设置环境变量
+### 5. 设置环境变量
 
 1. 进入 Worker 项目 > **Settings > Variables and Secrets**
 2. 点击 **Add**，添加：
@@ -64,7 +76,7 @@ cp .dev.vars.example .dev.vars
 npm run dev
 ```
 
-本地开发时需要在 `wrangler.toml` 中临时添加 KV 绑定配置（加上 `id` 和 `preview_id`），或使用 `--local` 模式（Wrangler 会自动创建本地 KV 存储）。
+本地开发建议使用 `wrangler dev --remote` 直接复用远端绑定，避免修改 `wrangler.toml`。
 
 ## 使用
 
@@ -94,6 +106,7 @@ GET /api/releases/:owner/:repo/:tag
 ### Admin API（需 Bearer Token）
 
 ```
+GET    /admin/api/auth                      # 验证 Admin Token
 PUT    /admin/api/repos/:owner/:repo/token   # 设置 Token（body: {"token":"ghp_..."}）
 DELETE /admin/api/repos/:owner/:repo/token   # 删除 Token
 GET    /admin/api/repos                      # 列出已配置的仓库
