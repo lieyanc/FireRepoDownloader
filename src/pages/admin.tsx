@@ -66,9 +66,14 @@ export const AdminPage: FC = () => {
     return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
   }
 
-  function setLoginStatus(message, color) {
+  function setStatusColor(el, cls) {
+    el.className = el.className.replace(/ ?status-\\S+/g, '');
+    if (cls) el.className += ' ' + cls;
+  }
+
+  function setLoginStatus(message, cls) {
     loginStatus.textContent = message || '';
-    loginStatus.style.color = color || '';
+    setStatusColor(loginStatus, cls);
   }
 
   function clearSession() {
@@ -79,7 +84,7 @@ export const AdminPage: FC = () => {
   function showLogin(message) {
     loginSection.style.display = 'block';
     adminContent.style.display = 'none';
-    setLoginStatus(message || '', message ? '#cf222e' : '');
+    setLoginStatus(message || '', message ? 'status-danger' : '');
   }
 
   function showAdmin() {
@@ -115,11 +120,11 @@ export const AdminPage: FC = () => {
   function tryLogin() {
     var inputToken = adminToken.value.trim();
     if (!inputToken) {
-      setLoginStatus('Token is required', '#cf222e');
+      setLoginStatus('Token is required', 'status-danger');
       return;
     }
     token = inputToken;
-    setLoginStatus('Verifying...', '#57606a');
+    setLoginStatus('Verifying...', 'status-muted');
     fetch('/admin/api/auth', { headers: apiHeaders() })
       .then(readResponse)
       .then(function(res) {
@@ -128,15 +133,15 @@ export const AdminPage: FC = () => {
           showAdmin();
         } else if (res.status === 500 && res.data && res.data.error === 'Admin authentication is not configured') {
           clearSession();
-          setLoginStatus('Server ADMIN_TOKEN is not configured', '#cf222e');
+          setLoginStatus('Server ADMIN_TOKEN is not configured', 'status-danger');
         } else {
           clearSession();
-          setLoginStatus((res.data && res.data.error) || 'Invalid token', '#cf222e');
+          setLoginStatus((res.data && res.data.error) || 'Invalid token', 'status-danger');
         }
       })
       .catch(function() {
         clearSession();
-        setLoginStatus('Connection error', '#cf222e');
+        setLoginStatus('Connection error', 'status-danger');
       });
   }
 
@@ -233,17 +238,17 @@ export const AdminPage: FC = () => {
     var status = document.getElementById('add-status');
     if (!repoName || !ghToken) {
       status.textContent = 'Both fields are required';
-      status.style.color = '#cf222e';
+      setStatusColor(status, 'status-danger');
       return;
     }
     var parts = repoName.split('/');
     if (parts.length !== 2) {
       status.textContent = 'Format: owner/repo';
-      status.style.color = '#cf222e';
+      setStatusColor(status, 'status-danger');
       return;
     }
     status.textContent = 'Validating...';
-    status.style.color = '#57606a';
+    setStatusColor(status, 'status-muted');
     fetch('/admin/api/repos/' + parts[0] + '/' + parts[1] + '/token', {
       method: 'PUT',
       headers: apiHeaders(),
@@ -253,17 +258,17 @@ export const AdminPage: FC = () => {
     .then(function(res) {
       if (res.ok) {
         status.textContent = 'Token saved for ' + repoName;
-        status.style.color = '#1a7f37';
+        setStatusColor(status, 'status-success');
         document.getElementById('repo-name').value = '';
         document.getElementById('github-token').value = '';
         loadRepos();
       } else {
         if (handleAuthFailure(res.status)) return;
         status.textContent = (res.data && res.data.error) || 'Failed to save token';
-        status.style.color = '#cf222e';
+        setStatusColor(status, 'status-danger');
       }
     })
-    .catch(function() { status.textContent = 'Connection error'; status.style.color = '#cf222e'; });
+    .catch(function() { status.textContent = 'Connection error'; setStatusColor(status, 'status-danger'); });
   });
 
   window.deleteRepo = function(repo) {

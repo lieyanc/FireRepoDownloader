@@ -66,7 +66,7 @@ export const RepoPage: FC<RepoPageProps> = ({ owner, repo, releases, page, hasMo
               </div>
             </div>
             {release.assets.length > 0 && (
-              <div class="mt-2" style="padding-top:8px;border-top:1px solid #f0f2f5">
+              <div class="mt-2 release-asset-divider">
                 {release.assets.slice(0, 5).map((asset) => (
                   <div class="asset-row">
                     <span class="asset-name text-sm">
