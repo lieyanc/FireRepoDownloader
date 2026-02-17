@@ -21,6 +21,11 @@ admin.use(
   }
 );
 
+// Auth probe endpoint: validate bearer token only.
+admin.get("/api/auth", (c) => {
+  return c.json({ ok: true });
+});
+
 // List all repos with configured tokens
 admin.get("/api/repos", async (c) => {
   const repos = await listRepos(c.env.REPO_TOKENS);

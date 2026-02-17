@@ -120,18 +120,18 @@ export const AdminPage: FC = () => {
     }
     token = inputToken;
     setLoginStatus('Verifying...', '#57606a');
-    fetch('/admin/api/repos', { headers: apiHeaders() })
+    fetch('/admin/api/auth', { headers: apiHeaders() })
       .then(readResponse)
       .then(function(res) {
         if (res.ok) {
           sessionStorage.setItem(tokenKey, token);
           showAdmin();
-        } else if (res.status === 500) {
+        } else if (res.status === 500 && res.data && res.data.error === 'Admin authentication is not configured') {
           clearSession();
           setLoginStatus('Server ADMIN_TOKEN is not configured', '#cf222e');
         } else {
           clearSession();
-          setLoginStatus('Invalid token', '#cf222e');
+          setLoginStatus((res.data && res.data.error) || 'Invalid token', '#cf222e');
         }
       })
       .catch(function() {
@@ -148,10 +148,14 @@ export const AdminPage: FC = () => {
       showLogin('');
       return;
     }
-    fetch('/admin/api/repos', { headers: apiHeaders() })
-      .then(function(r) {
-        if (r.ok) {
+    fetch('/admin/api/auth', { headers: apiHeaders() })
+      .then(readResponse)
+      .then(function(res) {
+        if (res.ok) {
           showAdmin();
+        } else if (res.status === 500 && res.data && res.data.error === 'Admin authentication is not configured') {
+          clearSession();
+          showLogin('Server ADMIN_TOKEN is not configured');
         } else {
           clearSession();
           showLogin('Please login');
