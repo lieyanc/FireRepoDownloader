@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import type { Bindings } from "../types";
 import {
-  getRelease,
-  getLatestRelease,
+  resolveRelease,
   downloadAsset,
   GitHubError,
 } from "../services/github";
@@ -17,10 +16,7 @@ download.get("/:owner/:repo/:tag/:asset", async (c) => {
   const token = await getToken(c.env.REPO_TOKENS, owner, repo);
 
   try {
-    const release =
-      tag === "latest"
-        ? await getLatestRelease(owner, repo, token)
-        : await getRelease(owner, repo, tag, token);
+    const release = await resolveRelease(owner, repo, tag, token);
 
     const asset = release.assets.find((a) => a.name === assetName);
     if (!asset) {

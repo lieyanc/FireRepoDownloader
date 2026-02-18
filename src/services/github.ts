@@ -84,6 +84,35 @@ export async function getLatestRelease(
   return res.json();
 }
 
+export async function getLatestPreRelease(
+  owner: string,
+  repo: string,
+  token?: string | null
+): Promise<GitHubRelease> {
+  const { releases } = await listReleases(owner, repo, 1, 100, token);
+  const preRelease = releases.find((r) => r.prerelease);
+  if (!preRelease) {
+    throw new GitHubError(404, "No pre-release found");
+  }
+  return preRelease;
+}
+
+export async function resolveRelease(
+  owner: string,
+  repo: string,
+  tag: string,
+  token?: string | null
+): Promise<GitHubRelease> {
+  switch (tag) {
+    case "latest":
+      return getLatestRelease(owner, repo, token);
+    case "pre-release":
+      return getLatestPreRelease(owner, repo, token);
+    default:
+      return getRelease(owner, repo, tag, token);
+  }
+}
+
 export async function downloadAsset(
   assetUrl: string,
   token?: string | null

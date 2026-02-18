@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Bindings } from "./types";
 import { GitHubError } from "./services/github";
 import { getToken } from "./services/token-store";
-import { listReleases, getRelease } from "./services/github";
+import { listReleases, resolveRelease } from "./services/github";
 import adminRoutes from "./routes/admin";
 import releasesRoutes from "./routes/releases";
 import downloadRoutes from "./routes/download";
@@ -77,7 +77,7 @@ app.get("/:owner/:repo/:tag", async (c) => {
   const token = await getToken(c.env.REPO_TOKENS, owner, repo);
 
   try {
-    const release = await getRelease(owner, repo, tag, token);
+    const release = await resolveRelease(owner, repo, tag, token);
     return c.html(<ReleasePage owner={owner} repo={repo} release={release} />);
   } catch (e) {
     if (e instanceof GitHubError && e.isNotFound) {
