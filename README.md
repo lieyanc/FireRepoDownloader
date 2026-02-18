@@ -40,10 +40,29 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
 1. 生产配置以 Dashboard 为准：
    - **Settings > Bindings** 管理 `REPO_TOKENS`、`DOWNLOAD_STATS`
    - **Settings > Variables and Secrets** 管理 `ADMIN_TOKEN`
-2. `wrangler.toml` 只保留基础字段（`name`、`main`、`compatibility_date`），不要写 `kv_namespaces`。
-3. Production Deploy command 使用 `--strict`，当本地配置和远端配置冲突时会阻止覆盖并报错。
-4. Non-Production 建议使用默认 `npx wrangler versions upload` 产出预览版本，不直接影响生产流量。
-5. 每次改完 Bindings/Secrets 后点击 **Deploy** 使其生效。
+2. 若 Production Deploy command 使用 `--strict`，仓库中的 Wrangler 配置必须镜像当前远端运行时配置（例如 `routes`、`kv_namespaces`），否则构建会因冲突被拒绝。
+3. 在 Dashboard 改动 Bindings 后，复制 Dashboard 提供的 TOML 片段到仓库配置并提交，再触发下一次 Git 构建。
+4. Production Deploy command 使用 `--strict`，当本地配置与远端配置不一致时会阻止覆盖并报错（这是预期保护行为）。
+5. Non-Production 建议使用默认 `npx wrangler versions upload` 产出预览版本，不直接影响生产流量。
+6. 每次改完 Bindings/Secrets 后点击 **Deploy** 使其生效。
+
+示例（将值替换为你的实际配置）：
+
+```toml
+routes = [
+  { pattern = "dl.repo.chycloud.top", zone_name = "chycloud.top", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "DOWNLOAD_STATS"
+id = "<DOWNLOAD_STATS_NAMESPACE_ID>"
+
+[[kv_namespaces]]
+binding = "REPO_TOKENS"
+id = "<REPO_TOKENS_NAMESPACE_ID>"
+```
+
+> 如果你不想在仓库中维护绑定镜像，则不要使用 `--strict`；但这样会失去“冲突即中断”的保护，存在误覆盖远端配置的风险。
 ### 4. 绑定 KV Namespace
 
 1. 进入部署好的 Worker 项目 > **Settings > Bindings**

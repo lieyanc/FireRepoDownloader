@@ -1,3 +1,15 @@
 name = "fire-repo-downloader"
 main = "src/index.tsx"
 compatibility_date = "2024-12-01"
+
+routes = [
+  { pattern = "dl.repo.chycloud.top", zone_name = "chycloud.top", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "DOWNLOAD_STATS"
+id = "52b15a55a2964a04821d14ea4e8b1357"
+
+[[kv_namespaces]]
+binding = "REPO_TOKENS"
+id = "bc3b14f025124feeaf1eab40af345e1a"
