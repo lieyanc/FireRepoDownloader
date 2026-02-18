@@ -49,6 +49,9 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
 示例（将值替换为你的实际配置）：
 
 ```toml
+workers_dev = true
+preview_urls = true
+
 routes = [
   { pattern = "dl.repo.chycloud.top", zone_name = "chycloud.top", custom_domain = true }
 ]
