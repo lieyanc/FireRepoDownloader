@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { Bindings } from "./types";
 import { GitHubError } from "./services/github";
 import adminRoutes from "./routes/admin";
@@ -9,6 +10,9 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // Global error handler
 app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
   if (err instanceof GitHubError) {
     if (err.isRateLimited) {
       return c.json({ error: "Rate limited by GitHub. Please try again later." }, 429);
