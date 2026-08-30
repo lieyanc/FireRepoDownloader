@@ -1,14 +1,22 @@
 # FireRepoDownloader
 
-GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和私有仓库，提供 Web UI 浏览 Release 和 Admin 管理面板。
+GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和私有仓库，提供基于 React、Tailwind CSS v4 与 shadcn/ui 的 Release 浏览器和 Admin 管理工作区。
 
 ## 功能
 
 - **下载代理** — 流式转发 GitHub Release asset，不缓冲整个文件
 - **私有仓库支持** — 通过 Admin API 为每个仓库配置 GitHub Access Token
-- **Web UI** — 浏览任意仓库的 Release 列表和 asset 详情
+- **Web UI** — 响应式浏览任意仓库的 Release 列表、Markdown 发布说明和 asset 详情
 - **下载统计** — 自动记录每个 asset 的下载次数
-- **Admin 面板** — Token 管理 + 统计概览，Bearer Token 认证
+- **Admin 工作区** — Token 管理 + 统计概览，Bearer Token 认证
+- **完整主题** — 以 `#018EEE` 为主色，支持浅色、深色与系统主题
+
+## 技术栈
+
+- Cloudflare Workers + Hono：API、GitHub 代理、KV 数据访问
+- React 19 + React Router：单页应用与客户端路由
+- Vite + Cloudflare 官方 Vite 插件：本地 Worker 环境与生产双环境构建
+- Tailwind CSS v4 + shadcn/ui（Radix Nova）：组件与设计系统
 
 ## 部署（Cloudflare Dashboard + Git）
 
@@ -26,7 +34,7 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
 2. 选择 **Connect to Git**，授权并选择本仓库
 3. 构建配置：
    - **Framework preset**: `None`
-   - **Build command**: `npm ci && npm run typecheck`
+   - **Build command**: `npm ci && npm run build`
    - **Deploy command (Production)**: `npx wrangler@latest deploy --strict`
    - **Deploy command (Non-Production)**: `npx wrangler@latest versions upload`
    - **Build output directory**: 留空（Worker 项目不需要）
@@ -94,11 +102,17 @@ npm install
 cp .dev.vars.example .dev.vars
 # 编辑 .dev.vars，设置 ADMIN_TOKEN
 
-# 启动开发服务器
+# 启动 Vite + Cloudflare Workers 本地开发环境
 npm run dev
 ```
 
-本地开发建议使用 `wrangler dev --remote` 直接复用远端绑定，避免修改 `wrangler.toml`。
+Vite 会通过 Cloudflare 官方插件启动 Worker 运行时并模拟 KV 绑定。生产前可以执行完整校验：
+
+```bash
+npm run check
+```
+
+该命令会依次运行 TypeScript 检查、前端与 Worker 生产构建，以及 `wrangler deploy --dry-run`。
 
 ## 使用
 
