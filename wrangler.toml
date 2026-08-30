@@ -3,6 +3,7 @@ main = "src/index.tsx"
 compatibility_date = "2026-08-30"
 workers_dev = true
 preview_urls = true
+keep_vars = true
 
 routes = [
   { pattern = "dl.repo.chycloud.top", zone_name = "chycloud.top", custom_domain = true }

@@ -40,14 +40,16 @@ GitHub Release 下载代理，部署在 Cloudflare Workers 上。支持公有和
    - **Build output directory**: 留空（Worker 项目不需要）
 4. 点击 **Save and Deploy**
 
-> 不要在仓库构建命令中使用 `npm run deploy` 或 `wrangler deploy`，避免把 Dashboard 运行时配置（例如 KV 绑定）被仓库文件覆盖。  
-> Workers Builds 仍会执行 Deploy command（默认就是 `npx wrangler deploy`）；这里的目标是把部署入口放在 Dashboard 配置里统一管理。
+> `wrangler.toml` 已启用 `keep_vars = true`，Git 部署会保留在 Dashboard 中管理的运行时变量与 Secret（例如 `ADMIN_TOKEN`）。
+>
+> Workers Builds 仍会执行 Deploy command；构建阶段必须运行 `npm run build`，让 Cloudflare Vite 插件生成包含静态资源目录的部署配置。
 
 ### 3. 配置归属（防止 KV 被后续 Git 部署覆盖）
 
 1. 生产配置以 Dashboard 为准：
    - **Settings > Bindings** 管理 `REPO_TOKENS`、`DOWNLOAD_STATS`
    - **Settings > Variables and Secrets** 管理 `ADMIN_TOKEN`
+   - 仓库通过 `keep_vars = true` 保留 Dashboard 中的变量与 Secret
 2. 若 Production Deploy command 使用 `--strict`，仓库中的 Wrangler 配置必须镜像当前远端运行时配置（例如 `routes`、`kv_namespaces`），否则构建会因冲突被拒绝。
 3. 在 Dashboard 改动 Bindings 后，复制 Dashboard 提供的 TOML 片段到仓库配置并提交，再触发下一次 Git 构建。
 4. Production Deploy command 使用 `--strict`，当本地配置与远端配置不一致时会阻止覆盖并报错（这是预期保护行为）。
