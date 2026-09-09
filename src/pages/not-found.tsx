@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ArrowLeftIcon, SearchXIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,10 @@ import {
 } from "@/components/ui/empty";
 
 export function NotFoundPage() {
+  useEffect(() => {
+    document.title = "Not found · FireRepoDownloader";
+  }, []);
+
   return (
     <Empty className="my-auto min-h-96 border">
       <EmptyHeader>
@@ -18,12 +23,10 @@ export function NotFoundPage() {
           <SearchXIcon />
         </EmptyMedia>
         <EmptyTitle>Page not found</EmptyTitle>
-        <EmptyDescription>
-          The route may be incomplete, or the repository path may have changed.
-        </EmptyDescription>
+        <EmptyDescription>That path doesn&apos;t match a repository or release.</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button asChild>
+        <Button variant="outline" size="sm" asChild>
           <Link to="/">
             <ArrowLeftIcon data-icon="inline-start" />
             Back to browse

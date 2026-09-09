@@ -23,6 +23,32 @@ export function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+const relativeUnits: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 365 * 24 * 60 * 60 * 1000],
+  ["month", 30 * 24 * 60 * 60 * 1000],
+  ["week", 7 * 24 * 60 * 60 * 1000],
+  ["day", 24 * 60 * 60 * 1000],
+  ["hour", 60 * 60 * 1000],
+  ["minute", 60 * 1000],
+];
+
+const relativeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+/** Compact age such as "3 days ago"; falls back to the absolute date for anything older than a year. */
+export function formatRelative(value: string): string {
+  const elapsed = Date.now() - new Date(value).getTime();
+  if (!Number.isFinite(elapsed)) return formatDate(value);
+  if (Math.abs(elapsed) >= relativeUnits[0][1]) return formatDate(value);
+
+  for (const [unit, milliseconds] of relativeUnits) {
+    if (Math.abs(elapsed) >= milliseconds) {
+      return relativeFormat.format(-Math.round(elapsed / milliseconds), unit);
+    }
+  }
+
+  return relativeFormat.format(0, "minute");
+}
+
 export function compactNumber(value: number): string {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }

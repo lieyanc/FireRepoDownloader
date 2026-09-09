@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertCircleIcon,
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  BoxIcon,
+  ArrowUpRightIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
+  CircleAlertIcon,
   DownloadIcon,
-  GitForkIcon,
   PackageOpenIcon,
   RefreshCwIcon,
+  TagIcon,
 } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -27,6 +25,7 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -47,89 +46,169 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
+import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { downloadPath, getReleases, releasePath, repoPath } from "@/lib/api";
-import { formatDate, formatSize } from "@/lib/format";
-import type { GitHubRelease } from "@/types";
+import { assetIcon } from "@/lib/asset";
+import { formatDate, formatRelative, formatSize } from "@/lib/format";
+import { rememberRepo } from "@/lib/recent";
+import type { GitHubAsset, GitHubRelease } from "@/types";
 
-function ReleasesLoading() {
+/** Assets shown on the featured card before deferring to the release page. */
+const featuredAssetLimit = 6;
+
+function totalSize(release: GitHubRelease): number {
+  return release.assets.reduce((total, asset) => total + asset.size, 0);
+}
+
+function StatusBadges({ release, isLatest }: { release: GitHubRelease; isLatest?: boolean }) {
+  return (
+    <>
+      {isLatest && <Badge>Latest</Badge>}
+      {release.prerelease && <Badge variant="secondary">Pre-release</Badge>}
+      {release.draft && <Badge variant="destructive">Draft</Badge>}
+    </>
+  );
+}
+
+function ReleasesSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-label="Loading releases">
-      {[0, 1, 2].map((item) => (
-        <Card key={item} size="sm">
-          <CardHeader>
-            <Skeleton className="h-5 w-56" />
-            <Skeleton className="h-4 w-36" />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </CardContent>
-        </Card>
-      ))}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-56" />
+          <Skeleton className="h-4 w-40" />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2.5">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2.5">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function ReleaseCard({ owner, repo, release }: { owner: string; repo: string; release: GitHubRelease }) {
-  const visibleAssets = release.assets.slice(0, 3);
+function FeaturedRelease({
+  owner,
+  repo,
+  release,
+}: {
+  owner: string;
+  repo: string;
+  release: GitHubRelease;
+}) {
+  const detailPath = releasePath(owner, repo, release.tag_name);
+  const visible = release.assets.slice(0, featuredAssetLimit);
+  const hidden = release.assets.length - visible.length;
 
   return (
-    <Card size="sm">
+    <Card>
       <CardHeader>
-        <CardTitle>
-          <Link className="hover:text-primary" to={releasePath(owner, repo, release.tag_name)}>
+        <CardTitle className="text-lg">
+          <Link className="transition-colors hover:text-link" to={detailPath}>
             {release.name || release.tag_name}
           </Link>
         </CardTitle>
-        <CardDescription>
-          Published {formatDate(release.published_at)} · {release.assets.length} asset
-          {release.assets.length === 1 ? "" : "s"}
+        <CardDescription className="tabular-nums">
+          <span title={formatDate(release.published_at)}>{formatRelative(release.published_at)}</span>
+          {release.assets.length > 0 && ` · ${release.assets.length} assets · ${formatSize(totalSize(release))}`}
         </CardDescription>
         <CardAction className="flex flex-wrap justify-end gap-1.5">
-          <Badge variant={release.prerelease ? "secondary" : "outline"}>{release.tag_name}</Badge>
-          {release.prerelease && <Badge variant="secondary">Pre-release</Badge>}
-          {release.draft && <Badge variant="destructive">Draft</Badge>}
+          <StatusBadges release={release} isLatest />
+          <Badge variant="outline">{release.tag_name}</Badge>
         </CardAction>
       </CardHeader>
 
-      <CardContent>
-        {visibleAssets.length > 0 ? (
+      {release.assets.length > 0 && (
+        <CardContent>
           <ItemGroup>
-            {visibleAssets.map((asset) => (
-              <Item key={asset.id} size="sm" variant="muted" asChild>
-                <a href={downloadPath(owner, repo, release.tag_name, asset.name)}>
-                  <ItemMedia variant="icon">
-                    <BoxIcon />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>{asset.name}</ItemTitle>
-                    <ItemDescription>{formatSize(asset.size)} · {asset.content_type}</ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <DownloadIcon />
-                  </ItemActions>
-                </a>
-              </Item>
+            {visible.map((asset) => (
+              <AssetRow
+                key={asset.id}
+                asset={asset}
+                href={downloadPath(owner, repo, release.tag_name, asset.name)}
+              />
             ))}
-            {release.assets.length > visibleAssets.length && (
-              <Item size="sm" asChild>
-                <Link to={releasePath(owner, repo, release.tag_name)}>
-                  <ItemContent>
-                    <ItemTitle>View {release.assets.length - visibleAssets.length} more assets</ItemTitle>
-                  </ItemContent>
-                  <ItemActions>
-                    <ChevronRightIcon />
-                  </ItemActions>
-                </Link>
-              </Item>
-            )}
           </ItemGroup>
-        ) : (
-          <p className="text-sm text-muted-foreground">This release has no downloadable assets.</p>
-        )}
-      </CardContent>
+        </CardContent>
+      )}
+
+      <CardFooter>
+        <Button variant="ghost" size="sm" className="w-full" asChild>
+          <Link to={detailPath}>
+            {hidden > 0 ? `${hidden} more assets and notes` : "Release notes"}
+            <ChevronRightIcon data-icon="inline-end" />
+          </Link>
+        </Button>
+      </CardFooter>
     </Card>
+  );
+}
+
+function AssetRow({ href, asset }: { href: string; asset: GitHubAsset }) {
+  const Icon = assetIcon(asset.name);
+
+  return (
+    <Item variant="outline" size="sm" asChild>
+      <a href={href}>
+        <ItemMedia variant="icon">
+          <Icon />
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle className="break-all">{asset.name}</ItemTitle>
+        </ItemContent>
+        <ItemActions>
+          <span className="text-xs tabular-nums text-muted-foreground">{formatSize(asset.size)}</span>
+          <DownloadIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+        </ItemActions>
+      </a>
+    </Item>
+  );
+}
+
+function ReleaseRow({
+  owner,
+  repo,
+  release,
+  isLatest,
+}: {
+  owner: string;
+  repo: string;
+  release: GitHubRelease;
+  isLatest: boolean;
+}) {
+  return (
+    <Item variant="outline" size="sm" asChild>
+      <Link to={releasePath(owner, repo, release.tag_name)}>
+        <ItemMedia variant="icon">
+          <TagIcon />
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle>{release.name || release.tag_name}</ItemTitle>
+          <ItemDescription className="tabular-nums">
+            <span title={formatDate(release.published_at)}>{formatRelative(release.published_at)}</span>
+            {release.assets.length > 0 &&
+              ` · ${release.assets.length} assets · ${formatSize(totalSize(release))}`}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <StatusBadges release={release} isLatest={isLatest} />
+          <ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+        </ItemActions>
+      </Link>
+    </Item>
   );
 }
 
@@ -154,6 +233,7 @@ export function RepoPage() {
       .then((result) => {
         setReleases(result.releases);
         setHasMore(result.has_more);
+        rememberRepo(owner, repo);
       })
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === "AbortError") return;
@@ -170,105 +250,179 @@ export function RepoPage() {
     () => releases.reduce((total, release) => total + release.assets.length, 0),
     [releases],
   );
+  // GitHub marks the newest stable release as "latest"; drafts and pre-releases never qualify.
+  const featured = useMemo(
+    () => (page === 1 ? releases.find((release) => !release.draft && !release.prerelease) : undefined),
+    [page, releases],
+  );
+  const rest = useMemo(
+    () => releases.filter((release) => release.id !== featured?.id),
+    [featured, releases],
+  );
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink asChild><Link to="/">Browse</Link></BreadcrumbLink>
+            <BreadcrumbLink asChild>
+              <Link to="/">Browse</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
-          <BreadcrumbItem><BreadcrumbPage>{owner}/{repo}</BreadcrumbPage></BreadcrumbItem>
+          <BreadcrumbItem>
+            <BreadcrumbPage>
+              {owner}/{repo}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
-      <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary"><GitForkIcon data-icon="inline-start" />Repository</Badge>
-            <Badge variant="outline">Page {page}</Badge>
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-              {owner}<span className="text-muted-foreground">/</span>{repo}
-            </h1>
-            <p className="text-muted-foreground">
-              {loading ? "Loading release history…" : `${releases.length} releases and ${assetCount} assets on this page.`}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="font-heading text-3xl font-semibold tracking-tight break-words sm:text-4xl">
+            {owner}
+            <span className="text-muted-foreground">/</span>
+            {repo}
+          </h1>
+          {loading ? (
+            <Skeleton className="h-5 w-44" />
+          ) : (
+            <p className="text-sm tabular-nums text-muted-foreground">
+              {releases.length} releases · {assetCount} assets
             </p>
-          </div>
+          )}
         </div>
-        <Button variant="outline" asChild>
-          <a href={`https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`} target="_blank" rel="noreferrer">
-            View on GitHub
-            <GitForkIcon data-icon="inline-end" />
-          </a>
-        </Button>
-      </section>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertTitle>Couldn&apos;t load this repository</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {loading ? (
-        <ReleasesLoading />
-      ) : error ? (
-        <div>
-          <Button variant="outline" onClick={() => setReloadKey((key) => key + 1)}>
-            <RefreshCwIcon data-icon="inline-start" />
-            Try again
+        <div className="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Reload releases"
+                disabled={loading}
+                onClick={() => setReloadKey((key) => key + 1)}
+              >
+                <RefreshCwIcon className={loading ? "animate-spin" : undefined} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reload</TooltipContent>
+          </Tooltip>
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={`https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+              <ArrowUpRightIcon data-icon="inline-end" />
+            </a>
           </Button>
         </div>
-      ) : releases.length === 0 ? (
-        <Empty className="min-h-80 border">
+      </header>
+
+      {loading ? (
+        <ReleasesSkeleton />
+      ) : error ? (
+        <Empty className="min-h-64 border">
           <EmptyHeader>
-            <EmptyMedia variant="icon"><PackageOpenIcon /></EmptyMedia>
-            <EmptyTitle>No releases found</EmptyTitle>
-            <EmptyDescription>
-              This repository has no published releases, or it needs a private repository token.
-            </EmptyDescription>
+            <EmptyMedia variant="icon">
+              <CircleAlertIcon />
+            </EmptyMedia>
+            <EmptyTitle>Couldn&apos;t load releases</EmptyTitle>
+            <EmptyDescription>{error}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent className="flex-row justify-center">
-            <Button variant="outline" asChild><Link to="/">Browse another repo</Link></Button>
-            <Button asChild><Link to="/admin">Open Admin</Link></Button>
+            <Button variant="outline" size="sm" onClick={() => setReloadKey((key) => key + 1)}>
+              <RefreshCwIcon data-icon="inline-start" />
+              Try again
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : releases.length === 0 ? (
+        <Empty className="min-h-64 border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageOpenIcon />
+            </EmptyMedia>
+            <EmptyTitle>No releases</EmptyTitle>
+            <EmptyDescription>This repository has no published releases.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent className="flex-row justify-center">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/">Browse another</Link>
+            </Button>
           </EmptyContent>
         </Empty>
       ) : (
         <div className="flex flex-col gap-4">
-          {releases.map((release) => (
-            <ReleaseCard key={release.id} owner={owner} repo={repo} release={release} />
-          ))}
+          {featured && <FeaturedRelease owner={owner} repo={repo} release={featured} />}
+
+          {rest.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{featured ? "Earlier releases" : "Releases"}</CardTitle>
+                <CardAction>
+                  <Badge variant="outline">{rest.length}</Badge>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <ItemGroup>
+                  {rest.map((release) => (
+                    <ReleaseRow
+                      key={release.id}
+                      owner={owner}
+                      repo={repo}
+                      release={release}
+                      isLatest={false}
+                    />
+                  ))}
+                </ItemGroup>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
       {!loading && !error && (page > 1 || hasMore) && (
-        <nav className="flex items-center justify-between" aria-label="Release pagination">
-          <div>
-            {page > 1 && (
-              <Button variant="outline" asChild>
-                <Link to={`${repoPath(owner, repo)}?page=${page - 1}`}>
-                  <ArrowLeftIcon data-icon="inline-start" />
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              {page > 1 ? (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to={`${repoPath(owner, repo)}?page=${page - 1}`}>
+                    <ChevronLeftIcon data-icon="inline-start" />
+                    Previous
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" disabled>
+                  <ChevronLeftIcon data-icon="inline-start" />
                   Previous
-                </Link>
-              </Button>
-            )}
-          </div>
-          <Badge variant="outline">Page {page}</Badge>
-          <div>
-            {hasMore && (
-              <Button variant="outline" asChild>
-                <Link to={`${repoPath(owner, repo)}?page=${page + 1}`}>
+                </Button>
+              )}
+            </PaginationItem>
+            <PaginationItem>
+              <span className="px-3 text-sm tabular-nums text-muted-foreground">Page {page}</span>
+            </PaginationItem>
+            <PaginationItem>
+              {hasMore ? (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to={`${repoPath(owner, repo)}?page=${page + 1}`}>
+                    Next
+                    <ChevronRightIcon data-icon="inline-end" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" disabled>
                   Next
-                  <ArrowRightIcon data-icon="inline-end" />
-                </Link>
-              </Button>
-            )}
-          </div>
-        </nav>
+                  <ChevronRightIcon data-icon="inline-end" />
+                </Button>
+              )}
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
     </div>
   );
